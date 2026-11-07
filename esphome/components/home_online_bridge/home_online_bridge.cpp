@@ -17,12 +17,19 @@ void HomeOnlineBridge::setup() {
 void HomeOnlineBridge::handshake_() {
   this->started_ = false;
   this->flush();
+  // The controller ignores an 'O' that arrives right behind the 'o' (it only answers with a prompt and never
+  // starts its heartbeat), so send 'O' from loop() after a short pause instead of back-to-back.
   this->write_str("o\r\n");
-  this->write_str("O\r\n");
+  this->open_pending_ = true;
+  this->open_at_ = millis() + kHandshakeGapMs;
   ESP_LOGD(TAG, "handshake sent");
 }
 
 void HomeOnlineBridge::loop() {
+  if (this->open_pending_ && static_cast<long>(millis() - this->open_at_) >= 0) {
+    this->open_pending_ = false;
+    this->write_str("O\r\n");
+  }
   uint8_t c;
   while (this->available() && this->read_byte(&c)) {
     this->liveness_.beat(millis());

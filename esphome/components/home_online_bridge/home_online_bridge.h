@@ -43,6 +43,9 @@ class HomeOnlineBridge : public Component, public uart::UARTDevice {
   std::vector<std::function<void(int, int)>> callbacks_;
   binary_sensor::BinarySensor *online_{nullptr};
   bool started_{false};  // first 'O' after the handshake seen
+  bool open_pending_{false};  // 'o' sent, 'O' follows after kHandshakeGapMs
+  unsigned long open_at_{0};
+  static constexpr unsigned long kHandshakeGapMs = 500;
 };
 
 class StateTrigger : public Trigger<int, int> {
