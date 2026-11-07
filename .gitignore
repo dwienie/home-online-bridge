@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.esphome/
+.pio/
+secrets.yaml
+*.secret
+*.log
+# private data: never publish
+seed_mappings.json
+mappings*.json
+.env
+.vscode/

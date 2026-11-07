@@ -1,0 +1,108 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Home Online Bridge",
+        "description": "Name of the ESPHome node that is wired to the Home Online controller (the node name, e.g. home_online_bridge). Slave mappings are added afterwards via Configure.",
+        "data": {
+          "device": "ESPHome node name"
+        }
+      },
+      "confirm_offline": {
+        "title": "Node not connected",
+        "description": "No ESPHome node named {device} is connected right now (its send action was not found). Add the integration anyway? Entities will work once the node is online. If the name is wrong, go back and correct it."
+      }
+    },
+    "error": {
+      "invalid_device": "Enter the ESPHome node name."
+    },
+    "abort": {
+      "already_configured": "This node is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Home Online Bridge mappings",
+        "menu_options": {
+          "add": "Add a mapping",
+          "edit": "Edit a mapping",
+          "remove": "Remove mappings",
+          "discovered": "Add from IDs seen on serial",
+          "ignore": "Ignore IDs seen on serial",
+          "save": "Save and apply (ignored IDs are saved too)",
+          "unignore": "Stop ignoring IDs"
+        }
+      },
+      "add": {
+        "title": "Add mapping",
+        "data": {
+          "id": "Controller ID",
+          "name": "Name",
+          "type": "Type",
+          "min_percent": "Dimmer minimum (%)",
+          "max_percent": "Dimmer maximum (%)"
+        },
+        "description": "Min/max are for dimmers only: HA 1-100 % is spread over this range, so 1 % still gives light. Raise the minimum until the lamp just lights."
+      },
+      "edit": {
+        "title": "Edit mapping",
+        "data": {
+          "id": "Mapping"
+        }
+      },
+      "edit_form": {
+        "title": "Edit mapping",
+        "data": {
+          "id": "Controller ID",
+          "name": "Name",
+          "type": "Type",
+          "min_percent": "Dimmer minimum (%)",
+          "max_percent": "Dimmer maximum (%)"
+        },
+        "description": "Min/max are for dimmers only: HA 1-100 % is spread over this range, so 1 % still gives light. Raise the minimum until the lamp just lights."
+      },
+      "remove": {
+        "title": "Remove mappings",
+        "data": {
+          "ids": "Mappings"
+        }
+      },
+      "discovered": {
+        "title": "IDs seen on serial",
+        "data": {
+          "id": "Controller ID"
+        }
+      },
+      "ignore": {
+        "title": "Ignore IDs",
+        "data": {
+          "ids": "Controller IDs"
+        }
+      },
+      "unignore": {
+        "title": "Stop ignoring IDs",
+        "data": {
+          "ids": "Controller IDs"
+        }
+      }
+    },
+    "error": {
+      "invalid_id": "ID must be a number from 0 to 999.",
+      "empty_name": "Name cannot be empty.",
+      "invalid_type": "Pick a type.",
+      "duplicate_id": "That ID is already mapped.",
+      "invalid_range": "Min must be lower than max (min 1-99, max 2-100)."
+    }
+  },
+  "selector": {
+    "mapping_type": {
+      "options": {
+        "dimmer": "Dimmer (light)",
+        "cover": "Curtain (cover)",
+        "relay": "Relay (switch)",
+        "sensor": "Read-only sensor"
+      }
+    }
+  }
+}

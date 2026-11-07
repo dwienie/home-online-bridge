@@ -1,0 +1,82 @@
+# Serial bridge between the Home Online controller (UART) and Home Assistant.
+# It knows no slave IDs: names and types are mapped in the Home Assistant "Home Online Bridge" integration.
+substitutions:
+  name: home-online-bridge
+  device_id: home_online_bridge  # name with '-' replaced by '_', as used by HA for action names
+
+esphome:
+  name: ${name}
+
+esp32:
+  # Set this to YOUR board. WEMOS D1 R32 / generic ESP32 dev boards: esp32dev.
+  # Other boards: https://esphome.io/components/esp32.html (board list).
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  baud_rate: 0  # UART0 stays free; use the network log
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+  on_client_connected:
+    # HA subscribes to our actions shortly after connecting; give it a moment, then replay all states.
+    - delay: 2s
+    - lambda: 'id(bridge)->resync();'
+  actions:
+    - action: send
+      variables:
+        id: int
+        value: int
+        percent: bool
+      then:
+        - lambda: 'id(bridge)->send(id, value, percent);'
+    - action: send_raw
+      variables:
+        line: string
+      then:
+        - lambda: 'id(bridge)->send_raw(line);'
+    - action: resync
+      then:
+        - lambda: 'id(bridge)->resync();'
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+uart:
+  id: controller_uart
+  tx_pin: GPIO17   # ESP32 TX -> RXD of the TTL-to-RS232 module
+  rx_pin: GPIO16   # ESP32 RX <- TXD of the TTL-to-RS232 module
+  baud_rate: 19200
+  rx_buffer_size: 2048
+
+external_components:
+  # Option A: use the component straight from GitHub.
+  - source:
+      type: git
+      url: https://github.com/dwienie/home-online-bridge
+      path: esphome/components
+      ref: v1.0.0
+  # Option B: use a local copy of the repo instead (comment out option A, uncomment this).
+  # - source:
+  #     type: local
+  #     path: components
+
+home_online_bridge:
+  id: bridge
+  uart_id: controller_uart
+  online:
+    name: "Controller online"
+  on_state:
+    - homeassistant.event:
+        event: esphome.home_online_bridge_state
+        data:
+          device: ${device_id}
+          id: !lambda 'return to_string(slave);'
+          value: !lambda 'return to_string(value);'
