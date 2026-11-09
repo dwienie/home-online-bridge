@@ -31,7 +31,8 @@
           "discovered": "Add from IDs seen on serial",
           "ignore": "Ignore IDs seen on serial",
           "save": "Save and apply (ignored IDs are saved too)",
-          "unignore": "Stop ignoring IDs"
+          "unignore": "Stop ignoring IDs",
+          "import_bin": "Import slaves from a Domati .bin file"
         }
       },
       "add": {
@@ -85,6 +86,33 @@
         "data": {
           "ids": "Controller IDs"
         }
+      },
+      "import_bin": {
+        "title": "Import from .bin",
+        "description": "Select the Domati .bin export of the controller. The file is only read to list its slaves and is not stored. Slaves that are already mapped are never offered again.",
+        "data": {
+          "file": ".bin file",
+          "show_inputs": "Also list inputs and buttons (hidden by default)"
+        }
+      },
+      "import_warn": {
+        "title": "Check the numbering",
+        "description": "The slave numbering in this file could not be fully verified:\n\n{warnings}\n\nIDs after the problem may belong to other devices. Continue only if you can check them afterwards.",
+        "menu_options": {
+          "import_select": "Continue anyway",
+          "init": "Cancel"
+        }
+      },
+      "import_select": {
+        "title": "Choose slaves to add",
+        "description": "{count} slaves can be added, shown as ID · name (module), with input/output when the file says so. The type is suggested in the next step. Nothing is selected by default.\n\nAlready mapped, so not selectable ({already_count}): {already}",
+        "data": {
+          "slaves": "Slaves"
+        }
+      },
+      "import_types": {
+        "title": "Choose the type per slave",
+        "description": "{count} slaves selected. The type is pre-filled with the suggestion; dimmers get the default range, calibrate them afterwards. The slaves are added to the list and applied with Save."
       }
     },
     "error": {
@@ -92,7 +120,12 @@
       "empty_name": "Name cannot be empty.",
       "invalid_type": "Pick a type.",
       "duplicate_id": "That ID is already mapped.",
-      "invalid_range": "Min must be lower than max (min 1-99, max 2-100)."
+      "invalid_range": "Min must be lower than max (min 1-99, max 2-100).",
+      "bin_unreadable": "Could not read the uploaded file.",
+      "bin_too_large": "The file is too large for a controller .bin (max 5 MB).",
+      "bin_no_modules": "No module list found: this does not look like a Domati .bin.",
+      "bin_no_records": "No slave records found: this does not look like a Domati .bin.",
+      "nothing_new": "Every slave in this file is already mapped or ignored."
     }
   },
   "selector": {

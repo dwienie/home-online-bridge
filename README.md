@@ -25,7 +25,7 @@ All names and types are configured in Home Assistant, in the UI.
 | Relay | `switch` |
 | Sensor (read-only) | `binary_sensor` |
 
-**Current version:** 1.0.0 (see [CHANGELOG](CHANGELOG.md)). The version is in
+**Current version:** 1.1.0 (see [CHANGELOG](CHANGELOG.md)). The version is in
 `custom_components/home_online_bridge/manifest.json`, and Home Assistant / HACS show it.
 
 > Not affiliated with Home Online. Use at your own risk: you are connecting a device to your home automation controller.
@@ -146,6 +146,8 @@ The numbers in the mapping are the **slave numbers** you see in the **Home Onlin
 - **Add a mapping**: enter the slave number, a name, and the type (dimmer, curtain, relay, sensor).
 - **Add from IDs seen on serial**: when a slave changes state (you press a wall switch), the number appears in this list.
   This is the easy way to find out which number is which: press the switch, then pick the new number and name it.
+- **Import slaves from a Domati .bin file**: read the export of the Home Online software and add many slaves in one go
+  (see [below](#import-slaves-from-a-bin-file)).
 - **Edit / remove** a mapping.
 - **Ignore IDs seen on serial**: hide numbers you never want to map.
 - Finish with **Save and apply**. No restart is needed.
@@ -160,6 +162,32 @@ The numbers in the mapping are the **slave numbers** you see in the **Home Onlin
 The entity's unique id is the slave number, so renaming a mapping keeps its history.
 All entities are *unavailable* while the node is offline or the "Controller online" sensor is off.
 Groups: use Home Assistant light groups.
+
+### Import slaves from a .bin file
+
+Instead of adding slaves one by one, you can read the **.bin file that you export from the Home Online software**
+and add the slaves you want in a single action. The file lists every slave of your installation, with its number,
+name and module, so you do not have to find the numbers by pressing switches.
+
+*Settings > Devices & services > Home Online Bridge > **Configure** > **Import slaves from a Domati .bin file***:
+
+1. **Choose the .bin file** from your computer. It is only read to list the slaves; it is not stored.
+   Inputs and buttons are hidden by default (there are usually a lot of them); tick the box to show them too.
+2. **Select the slaves to add.** Each entry is shown as `ID · name (module)`, for example
+   `384 · Output 1 (Bedieningspaneel Living) · output`. When the file says whether a slave is an **input** or an
+   **output**, that is added at the end. Nothing is selected by default.
+   Slaves that are already mapped (or ignored) are not offered again, so you cannot map a slave twice.
+3. **Choose the type per slave** (dimmer, curtain, relay, sensor). The type is pre-filled with a suggestion based on the
+   file; change it where it is wrong. The name from the file is used as the name of the mapping and can be changed
+   later with **Edit a mapping**.
+4. Finish with **Save and apply**, like any other change.
+
+Notes:
+
+- The slave numbers are calculated from the module list in the file. If they cannot be verified (for example because
+  of an unknown module type), you get a warning first and you can cancel. Check a few slaves after importing.
+- Dimmers get the default calibration range; see [Dimmer calibration](#dimmer-calibration-where-the-lamp-starts-and-where-it-is-at-full-brightness).
+- The .bin file contains the names of your installation. Do not publish it, and do not attach it to issues.
 
 ### Dimmer calibration: where the lamp starts, and where it is at full brightness
 

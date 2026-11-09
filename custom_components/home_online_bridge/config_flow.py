@@ -9,9 +9,14 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResu
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
+from homeassistant.components.file_upload import process_uploaded_file
+
+from .bin_import import BinImport, BinParseError, parse_bin
 from .conversion import DIMMER_MAX_PERCENT, DIMMER_MIN_PERCENT
 from .const import CONF_DEVICE, CONF_MAPPINGS, DOMAIN
 from .mappings import MAPPING_TYPES, MappingError, validate_mapping
+
+MAX_BIN_BYTES = 5 * 1024 * 1024
 
 TYPE_SELECTOR = selector.SelectSelector(
     selector.SelectSelectorConfig(
@@ -90,6 +95,9 @@ class HomeOnlineOptionsFlow(OptionsFlow):
         self._mappings: list[dict] | None = None
         self._ignored: set[int] | None = None
         self._editing: int | None = None
+        self._import: BinImport | None = None  # parsed .bin, kept only for the duration of this flow
+        self._import_show_inputs = False
+        self._import_ids: list[int] = []
 
     # --- staged state ----------------------------------------------------
     @property
@@ -118,7 +126,7 @@ class HomeOnlineOptionsFlow(OptionsFlow):
 
     # --- menu --------------------------------------------------------------
     def _menu(self) -> ConfigFlowResult:
-        options = ["add"]
+        options = ["add", "import_bin"]
         if self.mappings:
             options += ["edit", "remove"]
         if self._unmapped():
@@ -224,6 +232,136 @@ class HomeOnlineOptionsFlow(OptionsFlow):
             }
         )
         return self.async_show_form(step_id="unignore", data_schema=schema)
+
+    # --- import from a Domati .bin file ---------------------------------------
+    @staticmethod
+    def _read_upload(hass, file_id: str) -> bytes:
+        with process_uploaded_file(hass, file_id) as path:
+            if path.stat().st_size > MAX_BIN_BYTES:
+                raise ValueError("bin_too_large")
+            return path.read_bytes()
+
+    def _importable(self) -> list:
+        """Slaves from the file that can still be added: not mapped, not ignored, inputs only on request."""
+        assert self._import is not None
+        taken = {m["id"] for m in self.mappings} | self.ignored
+        return [
+            s
+            for s in self._import.slaves
+            if s.id not in taken and (self._import_show_inputs or not s.is_input)
+        ]
+
+    async def async_step_import_bin(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                data = await self.hass.async_add_executor_job(self._read_upload, self.hass, user_input["file"])
+                self._import = await self.hass.async_add_executor_job(parse_bin, data)
+            except BinParseError as err:
+                errors["base"] = str(err)
+            except ValueError as err:
+                errors["base"] = "bin_too_large" if str(err) == "bin_too_large" else "bin_unreadable"
+            else:
+                self._import_show_inputs = bool(user_input.get("show_inputs"))
+                if not self._importable():
+                    errors["base"] = "nothing_new"
+                elif self._import.warnings:
+                    return await self.async_step_import_warn()
+                else:
+                    return await self.async_step_import_select()
+        schema = vol.Schema(
+            {
+                vol.Required("file"): selector.FileSelector(selector.FileSelectorConfig(accept=".bin")),
+                vol.Optional("show_inputs", default=False): bool,
+            }
+        )
+        return self.async_show_form(step_id="import_bin", data_schema=schema, errors=errors)
+
+    async def async_step_import_warn(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """The slave numbering may be off: continuing could map the wrong devices, so ask first."""
+        assert self._import is not None
+        warnings = "\n".join(f"- {w}" for w in self._import.warnings)
+        return self.async_show_menu(
+            step_id="import_warn",
+            menu_options=["import_select", "init"],
+            description_placeholders={"warnings": warnings},
+        )
+
+    @staticmethod
+    def _import_label(s) -> str:
+        """'384 · Output 1 (Bediening Living) · output'; module and direction only when the file has them."""
+        label = f"{s.id} · {s.name or '(no name)'}"
+        if s.module:
+            label += f" ({s.module})"
+        if s.direction:
+            label += f" · {s.direction}"
+        return label
+
+    async def async_step_import_select(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        assert self._import is not None
+        candidates = self._importable()
+        if user_input is not None:
+            chosen = {int(i) for i in user_input.get("slaves", [])}
+            self._import_ids = sorted(chosen & {s.id for s in candidates})
+            if not self._import_ids:
+                return self._menu()
+            return await self.async_step_import_types()
+        by_mapping = {m["id"]: m["name"] for m in self.mappings}
+        already = [f"{s.id} {by_mapping[s.id]}" for s in self._import.slaves if s.id in by_mapping]
+        options = [selector.SelectOptionDict(value=str(s.id), label=self._import_label(s)) for s in candidates]
+        schema = vol.Schema(
+            {
+                vol.Optional("slaves", default=[]): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=options, multiple=True, mode=selector.SelectSelectorMode.LIST
+                    )
+                )
+            }
+        )
+        return self.async_show_form(
+            step_id="import_select",
+            data_schema=schema,
+            description_placeholders={
+                "count": str(len(candidates)),
+                "already_count": str(len(already)),
+                "already": ", ".join(already) or "-",
+            },
+        )
+
+    async def async_step_import_types(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        assert self._import is not None
+        chosen = {s.id: s for s in self._import.slaves if s.id in set(self._import_ids)}
+        # The field label is the key itself (no translation exists for a dynamic field).
+        keys = {sid: f"{sid} {s.name or 'slave'}" for sid, s in chosen.items()}
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            staged = list(self.mappings)
+            try:
+                for sid, s in chosen.items():
+                    staged.append(
+                        validate_mapping(
+                            {"id": sid, "name": " ".join(s.name.split()) or f"Slave {sid}", "type": user_input[keys[sid]]},
+                            staged,
+                        )
+                    )
+            except MappingError as err:
+                errors["base"] = str(err)
+            else:
+                self._mappings = staged
+                self._import_ids = []
+                return self._menu()
+        schema = vol.Schema(
+            {
+                vol.Required(keys[sid], default=s.suggested_type): TYPE_SELECTOR
+                for sid, s in chosen.items()
+            }
+        )
+        return self.async_show_form(
+            step_id="import_types",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"count": str(len(chosen))},
+        )
 
     async def async_step_save(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if self._hub is not None and self._ignored is not None:
