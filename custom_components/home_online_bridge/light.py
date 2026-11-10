@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from homeassistant.components.light import ATTR_BRIGHTNESS, ColorMode, LightEntity
 
-from .conversion import DIMMER_MAX_PERCENT, DIMMER_MIN_PERCENT, dimmer_read_percent, is_on, percent_to_brightness, turn_on_percent
+from .conversion import dimmer_read_percent, is_on, percent_to_brightness, turn_on_percent
 from .entity import HomeOnlineEntity, mappings_for
 
 
@@ -16,10 +16,20 @@ class HomeOnlineLight(HomeOnlineEntity, LightEntity):
 
     def __init__(self, hub, mapping) -> None:
         super().__init__(hub, mapping)
-        self._lo: int = mapping.get("min_percent", DIMMER_MIN_PERCENT)
-        self._hi: int = mapping.get("max_percent", DIMMER_MAX_PERCENT)
         self._last_on: int | None = None  # last non-zero percent, restored on a plain turn-on
         self._remember(self._value)
+
+    @property
+    def _lo(self) -> int:
+        return self.hub.calibration(self.slave_id)[0]
+
+    @property
+    def _hi(self) -> int:
+        return self.hub.calibration(self.slave_id)[1]
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(self.hub.subscribe_calibration(self.slave_id, self.async_write_ha_state))
 
     def _remember(self, value: int | None) -> None:
         if value:

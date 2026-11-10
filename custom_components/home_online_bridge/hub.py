@@ -5,8 +5,8 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from .const import EVENT_STATE
-from .conversion import parse_event_value
+from .const import CONF_MAPPINGS, EVENT_STATE
+from .conversion import DIMMER_MAX_PERCENT, DIMMER_MIN_PERCENT, parse_event_value
 from .mappings import Discovered
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,6 +23,10 @@ class HomeOnlineHub:
         self._available = True
         self._avail_subs: list[Callable[[], None]] = []
         self.store: Any = None  # set by the integration, used to persist `discovered`
+        self.entry: Any = None  # config entry, set by the integration; dimmer calibration is persisted in it
+        self.skip_reload = False  # set while persisting a calibration so the update listener does not reload
+        self._calib: dict[int, tuple[int, int]] = {}
+        self._calib_subs: dict[int, list[Callable[[], None]]] = {}
 
     # --- pure core -------------------------------------------------------
     def handle_event(self, data: dict) -> tuple[int, int] | None:
@@ -49,6 +53,49 @@ class HomeOnlineHub:
                 self._subs[id_].remove(callback)
 
         return unsubscribe
+
+    # --- dimmer calibration (min/max percent), live-editable without a reload --
+    def load_calibration(self, mappings: list[dict]) -> None:
+        self._calib = {
+            m["id"]: (m.get("min_percent", DIMMER_MIN_PERCENT), m.get("max_percent", DIMMER_MAX_PERCENT))
+            for m in mappings
+            if m["type"] == "dimmer"
+        }
+
+    def calibration(self, id_: int) -> tuple[int, int]:
+        return self._calib.get(id_, (DIMMER_MIN_PERCENT, DIMMER_MAX_PERCENT))
+
+    def subscribe_calibration(self, id_: int, callback: Callable[[], None]) -> Callable[[], None]:
+        self._calib_subs.setdefault(id_, []).append(callback)
+
+        def unsubscribe() -> None:
+            if callback in self._calib_subs.get(id_, []):
+                self._calib_subs[id_].remove(callback)
+
+        return unsubscribe
+
+    def set_calibration(self, id_: int, lo: int | None = None, hi: int | None = None) -> None:
+        cur_lo, cur_hi = self.calibration(id_)
+        lo = cur_lo if lo is None else lo
+        hi = cur_hi if hi is None else hi
+        if not 1 <= lo < hi <= 100:
+            raise ValueError("invalid_range")
+        self._calib[id_] = (lo, hi)
+        for cb in list(self._calib_subs.get(id_, ())):
+            cb()
+
+    async def async_set_calibration(self, id_: int, lo: int | None = None, hi: int | None = None) -> None:
+        self.set_calibration(id_, lo, hi)
+        lo, hi = self.calibration(id_)
+        mappings = [dict(m) for m in self.entry.options.get(CONF_MAPPINGS, [])]
+        for m in mappings:
+            if m["id"] == id_ and m["type"] == "dimmer":
+                m["min_percent"], m["max_percent"] = lo, hi
+        self.skip_reload = True
+        if not self.hass.config_entries.async_update_entry(
+            self.entry, options={**self.entry.options, CONF_MAPPINGS: mappings}
+        ):
+            self.skip_reload = False  # nothing changed, so the update listener will not run
 
     @property
     def available(self) -> bool:

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.0
+- Live dimmer calibration: every dimmer gets `minimum` and `maximum` number entities, a raw `calibration` slider that bypasses the calibration, and `calibration as minimum` / `calibration as maximum` buttons. A change applies immediately (no reload, no *Save and apply*) and is saved in the mapping, like *Edit a mapping*. The entities of a removed or retyped dimmer are cleaned up automatically.
+
 ## 1.1.0
 - Import slaves from a Domati `.bin` file (exported from the Home Online software): *Configure > Import slaves from a Domati .bin file*. Choose the slaves you want and add them as mappings in one action. The slaves are listed with their number, name and module (and input/output when the file says so); slaves that are already mapped are not offered again. A type is suggested per slave and can be changed. The file is not stored.
 - Adds the `file_upload` dependency (needed to upload the file).

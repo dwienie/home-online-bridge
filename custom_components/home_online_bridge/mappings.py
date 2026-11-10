@@ -95,10 +95,15 @@ class Discovered:
         return obj
 
 
+DIMMER_EXTRAS = (("min", "number"), ("max", "number"), ("raw", "number"), ("setmin", "button"), ("setmax", "button"))
 TYPE_PLATFORM = {"dimmer": "light", "cover": "cover", "relay": "switch", "sensor": "binary_sensor"}
 
 
 def orphaned_entities(registry: list[tuple[str, str, str]], mappings: list[dict]) -> list[str]:
     """registry rows are (entity_id, platform, unique_id); returns entity_ids to remove."""
     expected = {f"home_online_bridge_{m['id']}": TYPE_PLATFORM[m["type"]] for m in mappings}
+    for m in mappings:
+        if m["type"] == "dimmer":  # calibration helpers
+            for suffix, platform in DIMMER_EXTRAS:
+                expected[f"home_online_bridge_{m['id']}_{suffix}"] = platform
     return [eid for eid, platform, uid in registry if expected.get(uid) != platform]

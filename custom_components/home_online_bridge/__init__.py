@@ -19,6 +19,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: HomeOnlineConfigEntry) -
     discovered = Discovered.from_dict(saved) if saved else Discovered()
     hub = HomeOnlineHub(hass, entry.data[CONF_DEVICE], discovered)
     hub.store = store
+    hub.entry = entry
+    hub.load_calibration(entry.options.get(CONF_MAPPINGS, []))
     discovered.on_change = lambda: store.async_delay_save(discovered.to_dict, 10)
     entry.runtime_data = hub
 
@@ -40,6 +42,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: HomeOnlineConfigEntry) -
 
 
 async def _reload(hass: HomeAssistant, entry: HomeOnlineConfigEntry) -> None:
+    if entry.runtime_data.skip_reload:  # live calibration edit, already applied in memory
+        entry.runtime_data.skip_reload = False
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 

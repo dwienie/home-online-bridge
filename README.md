@@ -25,7 +25,7 @@ All names and types are configured in Home Assistant, in the UI.
 | Relay | `switch` |
 | Sensor (read-only) | `binary_sensor` |
 
-**Current version:** 1.1.0 (see [CHANGELOG](CHANGELOG.md)). The version is in
+**Current version:** 1.2.0 (see [CHANGELOG](CHANGELOG.md)). The version is in
 `custom_components/home_online_bridge/manifest.json`, and Home Assistant / HACS show it.
 
 > Not affiliated with Home Online. Use at your own risk: you are connecting a device to your home automation controller.
@@ -200,12 +200,39 @@ Each dimmer has two settings:
 - **Dimmer maximum (%)**: the controller level where the lamp is at 100 % of its brightness.
 
 Home Assistant 1 % then maps to the minimum, and 100 % maps to the maximum, with a smooth range in between.
-Defaults are 8 and 100. Set them in *Configure > Edit a mapping*.
+Defaults are 8 and 100. Set them in *Configure > Edit a mapping*, or calibrate live with the entities below.
 
-#### Find the right values with a calibration dashboard
+#### Calibrate live with the dimmer's own entities
 
-Use this to test raw controller values and watch the lamp. It sends a value straight to a slave, without any
-calibration applied.
+Every dimmer also gets five extra entities. They are named after the mapping, so for a dimmer called `Zit` you find
+`Zit minimum`, `Zit calibration` and so on (search for the name in *Settings > Devices & services > Entities*, or open
+*Settings > Devices & services > Home Online Bridge > entities*). The minimum, maximum and the two buttons are in
+category *Configuration*; the calibration slider is a normal control.
+
+| Entity | Type | What it does |
+|---|---|---|
+| `<name> minimum` | number (%) | The calibrated minimum. Changing it applies immediately and is saved in the mapping. |
+| `<name> maximum` | number (%) | The calibrated maximum. Changing it applies immediately and is saved in the mapping. |
+| `<name> calibration` | number (0-100) | Sends a raw controller level straight to the dimmer, **bypassing the calibration**. |
+| `<name> calibration as minimum` | button | Takes the current raw level as the new minimum. |
+| `<name> calibration as maximum` | button | Takes the current raw level as the new maximum. |
+
+Calibrate one dimmer:
+
+1. Find the five entities of the dimmer (see above), for example in a dashboard card.
+2. **Minimum:** start with the *calibration* slider at 0 and raise it until the lamp **just** lights. Press
+   *calibration as minimum*.
+3. **Maximum:** set the slider to 100 and lower it step by step. At the highest level where the lamp **still gets
+   brighter**, press *calibration as maximum*. (If the lamp is still brighter at 100, the maximum stays 100.)
+4. Check: slide the light in Home Assistant to 1 % (barely on) and 100 % (full brightness).
+
+The minimum must stay lower than the maximum; otherwise you get an error and nothing changes. No reload and no
+*Save and apply* are needed. The helpers, script and dashboard below do the same job by hand and are no longer
+needed if you use these entities.
+
+#### Alternative: a calibration dashboard with helpers
+
+This sends a raw value straight to a slave, without any calibration applied, so you can watch the lamp.
 
 1. *Settings > Devices & services > Helpers*, create two helpers (or add them in `configuration.yaml`):
 
